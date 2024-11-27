@@ -1,0 +1,3 @@
+pyfldigi
+pycryptodome
+windows-curses; sys_platform == 'win32'
