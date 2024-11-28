@@ -1,10 +1,11 @@
 import base64
+import curses
 import hashlib
 import logging
 import os
 import threading
 import time
-import curses
+
 import pyfldigi
 from Crypto.Cipher import AES
 
@@ -26,6 +27,7 @@ messages = {"received": [], "transmitted": []}
 # Encryption enabled flag
 encryption_enabled = True
 
+
 # AES decryption function
 def decrypt_message(encrypted_message, key):
     try:
@@ -41,12 +43,14 @@ def decrypt_message(encrypted_message, key):
         logger.error(f"Decryption failed: {e}")
         return None
 
+
 # AES encryption function
 def encrypt_message(key, message):
     iv = os.urandom(AES.block_size)
     cipher = AES.new(key, AES.MODE_CFB, iv)
     encrypted = iv + cipher.encrypt(message.encode())
     return base64.b64encode(encrypted).decode()
+
 
 # Listener thread function
 def fldigi_listener():
@@ -77,6 +81,7 @@ def fldigi_listener():
         except Exception as e:
             logger.error(f"Error in fldigi listener: {e}")
             time.sleep(5)
+
 
 def main(stdscr):
     global encryption_enabled
@@ -152,6 +157,7 @@ def main(stdscr):
         input_win.clear()
         input_win.border()
         input_win.addstr(1, 1, "Enter message (/help for commands): ")
+
 
 if __name__ == "__main__":
     listener_thread = threading.Thread(target=fldigi_listener, daemon=True)

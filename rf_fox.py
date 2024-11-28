@@ -116,15 +116,6 @@ def fldigi_listener():
 @app.route("/", methods=["GET", "POST"])
 def index():
     try:
-        current_mode = fldigi_client.modem.name
-        modes = fldigi_client.modem.names
-
-        if request.method == "POST":
-            new_mode = request.form.get("mode")
-            if new_mode and new_mode in modes:
-                fldigi_client.modem.name = new_mode
-                logger.info(f"Mode changed to {new_mode}")
-
         return render_template_string(
             '''
             <!doctype html>
@@ -148,17 +139,7 @@ def index():
                     <br><br>
                     <input type="submit" value="Broadcast">
                 </form>
-                <h2>Operating Mode</h2>
-                <form method="POST" action="/">
-                    <label for="mode">Select Mode:</label>
-                    <select id="mode" name="mode">
-                        {% for mode in modes %}
-                        <option value="{{ mode }}" {% if mode == current_mode %}selected{% endif %}>{{ mode }}</option>
-                        {% endfor %}
-                    </select>
-                    <button type="submit">Change Mode</button>
-                </form>
-                <h2>Current Mode: {{ current_mode }}</h2>
+                <a href="/settings">Go to Settings</a>
                 <h2>Received Messages</h2>
                 <ul>
                 {% for msg in messages["received"] %}
@@ -183,8 +164,6 @@ def index():
             </html>
             ''',
             messages=messages,
-            modes=modes,
-            current_mode=current_mode,
         )
     except Exception as e:
         logger.error(f"Error in index route: {e}")
@@ -224,6 +203,50 @@ def broadcast():
         logger.error(f"Error during broadcast: {e}")
         return f"<h1>Error: {str(e)}</h1><a href='/'>Try Again</a>"
 
+@app.route("/settings", methods=["GET", "POST"])
+def settings():
+    try:
+        current_mode = fldigi_client.modem.name
+        modes = fldigi_client.modem.names
+
+        if request.method == "POST":
+            new_mode = request.form.get("mode")
+            if new_mode and new_mode in modes:
+                fldigi_client.modem.name = new_mode
+                logger.info(f"Mode changed to {new_mode}")
+
+        return render_template_string(
+            '''
+            <!doctype html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>RF Fox - Settings</title>
+            </head>
+            <body>
+                <h1>Settings</h1>
+                <h2>Operating Mode</h2>
+                <form method="POST" action="/settings">
+                    <label for="mode">Select Mode:</label>
+                    <select id="mode" name="mode">
+                        {% for mode in modes %}
+                        <option value="{{ mode }}" {% if mode == current_mode %}selected{% endif %}>{{ mode }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit">Change Mode</button>
+                </form>
+                <h2>Current Mode: {{ current_mode }}</h2>
+                <a href="/">Back to Home</a>
+            </body>
+            </html>
+            ''',
+            current_mode=current_mode,
+            modes=modes,
+        )
+    except Exception as e:
+        logger.error(f"Error in settings route: {e}")
+        return "<h1>Error loading settings page</h1>"
 
 if __name__ == "__main__":
     listener_thread = threading.Thread(target=fldigi_listener, daemon=True)
