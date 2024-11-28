@@ -1,17 +1,18 @@
 import base64
-import hashlib
 import logging
 import os
 import threading
 import time
 
 import pyfldigi
-from Crypto.Cipher import AES
+from Crypto.Cipher import PKCS1_OAEP
+from Crypto.PublicKey import RSA
 from flask import Flask, request, render_template_string
 
 # Constants
-AES_KEY_SIZE = 16
-AES_KEY = hashlib.sha256(b"d2a7a6abeb88d67684c8abb8fde01316").digest()[:AES_KEY_SIZE]
+KEY_DIR = os.path.expanduser("~/.rf_fox")
+PRIVATE_KEY_PATH = os.path.join(KEY_DIR, "private_key.pem")
+PUBLIC_KEY_PATH = os.path.join(KEY_DIR, "public_key.pem")
 
 # Flask app setup
 app = Flask(__name__)
@@ -28,28 +29,61 @@ messages_lock = threading.Lock()
 messages = {"received": [], "transmitted": []}
 
 
-# AES decryption function
-def decrypt_message(encrypted_message, key):
+def generate_rsa_keys():
+    """Generates RSA key pair and saves them to ~/.rf_fox directory."""
+    os.makedirs(KEY_DIR, exist_ok=True)
+    key = RSA.generate(2048)
+    private_key = key.export_key()
+    public_key = key.publickey().export_key()
+
+    with open(PRIVATE_KEY_PATH, "wb") as private_file:
+        private_file.write(private_key)
+
+    with open(PUBLIC_KEY_PATH, "wb") as public_file:
+        public_file.write(public_key)
+
+    logger.info("RSA key pair generated and saved to ~/.rf_fox")
+
+
+def load_rsa_keys():
+    """Loads RSA private and public keys, generating them if not present."""
+    if not os.path.exists(PRIVATE_KEY_PATH) or not os.path.exists(PUBLIC_KEY_PATH):
+        generate_rsa_keys()
+
+    with open(PRIVATE_KEY_PATH, "rb") as private_file:
+        private_key = RSA.import_key(private_file.read())
+
+    with open(PUBLIC_KEY_PATH, "rb") as public_file:
+        public_key = RSA.import_key(public_file.read())
+
+    return private_key, public_key
+
+
+# Load RSA keys
+private_key, public_key = load_rsa_keys()
+private_cipher = PKCS1_OAEP.new(private_key)
+public_cipher = PKCS1_OAEP.new(public_key)
+
+
+# RSA decryption function
+def decrypt_message(encrypted_message):
     try:
         encrypted_data = base64.b64decode(encrypted_message)
-        if len(encrypted_data) < AES.block_size:
-            raise ValueError("Invalid encrypted data length.")
-        iv = encrypted_data[:AES.block_size]
-        ciphertext = encrypted_data[AES.block_size:]
-        cipher = AES.new(key, AES.MODE_CFB, iv)
-        plaintext = cipher.decrypt(ciphertext)
-        return plaintext.decode('utf-8')
+        plaintext = private_cipher.decrypt(encrypted_data)
+        return plaintext.decode("utf-8")
     except Exception as e:
         logger.error(f"Decryption failed: {e}")
         return None
 
 
-# AES encryption function
-def encrypt_message(key, message):
-    iv = os.urandom(AES.block_size)
-    cipher = AES.new(key, AES.MODE_CFB, iv)
-    encrypted = iv + cipher.encrypt(message.encode())
-    return base64.b64encode(encrypted).decode()
+# RSA encryption function
+def encrypt_message(message):
+    try:
+        ciphertext = public_cipher.encrypt(message.encode("utf-8"))
+        return base64.b64encode(ciphertext).decode("utf-8")
+    except Exception as e:
+        logger.error(f"Encryption failed: {e}")
+        return None
 
 
 # Listener thread function
@@ -62,7 +96,7 @@ def fldigi_listener():
                 timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
 
                 with messages_lock:
-                    decrypted_text = decrypt_message(received_text, AES_KEY)
+                    decrypted_text = decrypt_message(received_text)
                     messages["received"].append({
                         "message": received_text,
                         "decrypted": decrypted_text,
@@ -73,7 +107,7 @@ def fldigi_listener():
                 else:
                     logger.info(f"Received plaintext message: {received_text}")
 
-            time.sleep(0.5)  # Improved responsiveness
+            time.sleep(0.5)
         except Exception as e:
             logger.error(f"Error in fldigi listener: {e}")
             time.sleep(5)
@@ -173,14 +207,14 @@ def broadcast():
             fldigi_client.text.add_tx(message)
             fldigi_client.main.tx()
         else:
-            encrypted_message = encrypt_message(AES_KEY, message)
+            encrypted_message = encrypt_message(message)
             fldigi_client.text.clear_tx()
             fldigi_client.text.add_tx(encrypted_message)
             fldigi_client.main.tx()
 
         with messages_lock:
             messages["transmitted"].append({
-                "encrypted": encrypt_message(AES_KEY, message) if encryption_choice == "encrypted" else None,
+                "encrypted": encrypt_message(message) if encryption_choice == "encrypted" else None,
                 "decrypted": message,
                 "timestamp": timestamp,
             })
