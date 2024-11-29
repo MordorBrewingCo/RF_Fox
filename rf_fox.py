@@ -203,17 +203,44 @@ def broadcast():
         logger.error(f"Error during broadcast: {e}")
         return f"<h1>Error: {str(e)}</h1><a href='/'>Try Again</a>"
 
+
 @app.route("/settings", methods=["GET", "POST"])
 def settings():
     try:
+        # Get current modem mode and available modes
         current_mode = fldigi_client.modem.name
         modes = fldigi_client.modem.names
 
+        # Directory for storing public keys
+        os.makedirs(KEY_DIR, exist_ok=True)
+        public_keys_dir = os.path.join(KEY_DIR, "public_keys")
+        os.makedirs(public_keys_dir, exist_ok=True)
+
         if request.method == "POST":
-            new_mode = request.form.get("mode")
-            if new_mode and new_mode in modes:
-                fldigi_client.modem.name = new_mode
-                logger.info(f"Mode changed to {new_mode}")
+            # Handle mode change
+            if "change_mode" in request.form:
+                new_mode = request.form.get("mode")
+                if new_mode and new_mode in modes:
+                    fldigi_client.modem.name = new_mode
+                    logger.info(f"Mode changed to {new_mode}")
+
+            # Handle public key import
+            if "import_key" in request.form:
+                key_alias = request.form.get("key_alias").strip()
+                public_key_content = request.form.get("public_key").strip()
+                if key_alias and public_key_content:
+                    key_file_path = os.path.join(public_keys_dir, f"{key_alias}.pem")
+                    try:
+                        # Validate the public key format
+                        RSA.import_key(public_key_content)
+                        with open(key_file_path, "w") as key_file:
+                            key_file.write(public_key_content)
+                        logger.info(f"Imported public key with alias '{key_alias}'")
+                    except ValueError as e:
+                        logger.error(f"Invalid public key format: {e}")
+
+        # List stored public keys
+        stored_keys = [f.replace(".pem", "") for f in os.listdir(public_keys_dir) if f.endswith(".pem")]
 
         return render_template_string(
             '''
@@ -226,8 +253,10 @@ def settings():
             </head>
             <body>
                 <h1>Settings</h1>
+
                 <h2>Operating Mode</h2>
                 <form method="POST" action="/settings">
+                    <input type="hidden" name="change_mode" value="1">
                     <label for="mode">Select Mode:</label>
                     <select id="mode" name="mode">
                         {% for mode in modes %}
@@ -237,16 +266,38 @@ def settings():
                     <button type="submit">Change Mode</button>
                 </form>
                 <h2>Current Mode: {{ current_mode }}</h2>
+
+                <h2>Import Public Key</h2>
+                <form method="POST" action="/settings">
+                    <input type="hidden" name="import_key" value="1">
+                    <label for="key_alias">Key Alias:</label>
+                    <input type="text" id="key_alias" name="key_alias" required>
+                    <br><br>
+                    <label for="public_key">Public Key:</label>
+                    <textarea id="public_key" name="public_key" required style="resize: both; width: 100%; height: 100px;"></textarea>
+                    <br><br>
+                    <button type="submit">Import Key</button>
+                </form>
+
+                <h2>Stored Public Keys</h2>
+                <ul>
+                    {% for key in stored_keys %}
+                    <li>{{ key }}</li>
+                    {% endfor %}
+                </ul>
+
                 <a href="/">Back to Home</a>
             </body>
             </html>
             ''',
             current_mode=current_mode,
             modes=modes,
+            stored_keys=stored_keys,
         )
     except Exception as e:
         logger.error(f"Error in settings route: {e}")
         return "<h1>Error loading settings page</h1>"
+
 
 if __name__ == "__main__":
     listener_thread = threading.Thread(target=fldigi_listener, daemon=True)
