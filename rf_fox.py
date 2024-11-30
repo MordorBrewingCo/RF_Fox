@@ -287,13 +287,15 @@ def settings():
         modes = fldigi_client.modem.names
 
         if request.method == "POST":
+            # Handle mode change
             if "change_mode" in request.form:
                 new_mode = request.form.get("mode")
                 if new_mode in modes:
                     fldigi_client.modem.name = new_mode
                     logger.info(f"Mode changed to {new_mode}")
 
-            if "import_key" in request.form:
+            # Handle public key import
+            elif "import_key" in request.form:
                 key_alias = request.form.get("key_alias", "").strip()
                 public_key_content = request.form.get("public_key", "").strip()
                 if key_alias and public_key_content:
@@ -306,6 +308,17 @@ def settings():
                     except ValueError as e:
                         logger.error(f"Invalid public key format: {e}")
 
+            # Handle public key deletion
+            elif "delete_key" in request.form:
+                key_alias = request.form.get("key_alias", "").strip()
+                key_path = os.path.join(PUBLIC_KEYS_DIR, f"{key_alias}.pem")
+                if os.path.exists(key_path):
+                    os.remove(key_path)
+                    logger.info(f"Public key '{key_alias}' deleted successfully.")
+                else:
+                    logger.error(f"Public key '{key_alias}' not found.")
+
+        # List stored public keys
         stored_keys = [key.replace(".pem", "") for key in os.listdir(PUBLIC_KEYS_DIR) if key.endswith(".pem")]
 
         return render_template_string(
@@ -348,7 +361,14 @@ def settings():
                 <h2>Stored Public Keys</h2>
                 <ul>
                     {% for key in stored_keys %}
-                    <li>{{ key }}</li>
+                    <li>
+                        {{ key }}
+                        <form method="POST" style="display: inline;">
+                            <input type="hidden" name="delete_key" value="1">
+                            <input type="hidden" name="key_alias" value="{{ key }}">
+                            <button type="submit" style="color: red;">Delete</button>
+                        </form>
+                    </li>
                     {% endfor %}
                 </ul>
 
