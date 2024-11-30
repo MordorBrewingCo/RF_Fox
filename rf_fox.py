@@ -76,15 +76,6 @@ def decrypt_message(encrypted_message):
         return None
 
 
-def encrypt_message(message):
-    try:
-        ciphertext = public_cipher.encrypt(message.encode("utf-8"))
-        return base64.b64encode(ciphertext).decode("utf-8")
-    except Exception as e:
-        logger.error(f"Encryption failed: {e}")
-        return None
-
-
 def fldigi_listener():
     """Listens for incoming messages from fldigi."""
     logger.info("Starting fldigi listener thread...")
