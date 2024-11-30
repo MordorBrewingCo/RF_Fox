@@ -7,7 +7,7 @@ import time
 import pyfldigi
 from Crypto.Cipher import PKCS1_OAEP
 from Crypto.PublicKey import RSA
-from flask import Flask, request, render_template_string
+from flask import Flask, render_template_string, request
 
 # Constants
 KEY_DIR = os.path.expanduser("~/.rf_fox")
@@ -65,7 +65,6 @@ private_cipher = PKCS1_OAEP.new(private_key)
 public_cipher = PKCS1_OAEP.new(public_key)
 
 
-# RSA decryption function
 def decrypt_message(encrypted_message):
     try:
         encrypted_data = base64.b64decode(encrypted_message)
@@ -76,7 +75,6 @@ def decrypt_message(encrypted_message):
         return None
 
 
-# RSA encryption function
 def encrypt_message(message):
     try:
         ciphertext = public_cipher.encrypt(message.encode("utf-8"))
@@ -86,7 +84,6 @@ def encrypt_message(message):
         return None
 
 
-# Listener thread function
 def fldigi_listener():
     logger.info("Starting fldigi listener thread...")
     while True:
@@ -131,20 +128,32 @@ def index():
                         padding: 0;
                         text-align: left;
                     }
-                    img {
-                        max-width: 80%;
-                        height: auto;
-                        margin-bottom: 20px;
-                        border-radius: 10px;
-                        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                    .top-right-nav {
+                        position: absolute;
+                        top: 10px;
+                        right: 10px;
+                        display: flex;
+                        gap: 10px;
                     }
-                    form {
-                        margin-bottom: 30px;
+                    .top-right-nav a {
+                        text-decoration: none;
+                        color: #007BFF;
+                        font-weight: bold;
+                        padding: 5px 10px;
+                        border-radius: 5px;
+                        transition: background-color 0.3s ease;
+                    }
+                    .top-right-nav a:hover {
+                        background-color: #f0f0f0;
                     }
                 </style>
             </head>
             <body>
-                <img src="static/logo.png" alt="RF Fox Logo">
+                <div class="top-right-nav">
+                    <a href="/settings">Settings</a>
+                    <a href="/public_key">My Public Key</a>
+                </div>
+                <img src="static/logo.png" alt="RF Fox Logo" style="max-width: 200px; margin-bottom: 20px;">
                 <h1>Broadcast a Message</h1>
                 <form method="POST" action="/broadcast">
                     <label for="message">Message:</label>
@@ -158,7 +167,6 @@ def index():
                     <br><br>
                     <input type="submit" value="Broadcast">
                 </form>
-                <a href="/settings">Go to Settings</a>
                 <h2>Received Messages</h2>
                 <ul>
                 {% for msg in messages["received"] %}
@@ -221,6 +229,35 @@ def broadcast():
     except Exception as e:
         logger.error(f"Error during broadcast: {e}")
         return f"<h1>Error: {str(e)}</h1><a href='/'>Try Again</a>"
+
+
+@app.route("/public_key", methods=["GET"])
+def public_key_page():
+    try:
+        with open(PUBLIC_KEY_PATH, "r") as public_file:
+            public_key_content = public_file.read()
+
+        return render_template_string(
+            '''
+            <!doctype html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>My Public Key</title>
+                </head>
+            <body>
+                <h1>My Public Key</h1>
+                <pre>{{ public_key }}</pre>
+                <a href="/">Back to Home</a>
+            </body>
+            </html>
+            ''',
+            public_key=public_key_content,
+        )
+    except Exception as e:
+        logger.error(f"Error in public key page: {e}")
+        return "<h1>Error loading public key page</h1><a href='/'>Back to Home</a>"
 
 
 @app.route("/settings", methods=["GET", "POST"])
