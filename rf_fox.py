@@ -250,10 +250,22 @@ def public_key_page():
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>My Public Key</title>
-                </head>
+                <script>
+                    function copyToClipboard() {
+                        const publicKey = document.getElementById("publicKey").innerText;
+                        navigator.clipboard.writeText(publicKey).then(() => {
+                            alert("Public key copied to clipboard!");
+                        }).catch(err => {
+                            alert("Failed to copy public key: " + err);
+                        });
+                    }
+                </script>
+            </head>
             <body>
                 <h1>My Public Key</h1>
-                <pre>{{ public_key }}</pre>
+                <pre id="publicKey">{{ public_key }}</pre>
+                <button onclick="copyToClipboard()">Copy to Clipboard</button>
+                <br><br>
                 <a href="/">Back to Home</a>
             </body>
             </html>
