@@ -13,6 +13,7 @@ from flask import Flask, render_template_string, request
 KEY_DIR = os.path.expanduser("~/.rf_fox")
 PRIVATE_KEY_PATH = os.path.join(KEY_DIR, "private_key.pem")
 PUBLIC_KEY_PATH = os.path.join(KEY_DIR, "public_key.pem")
+PUBLIC_KEYS_DIR = os.path.join(KEY_DIR, "public_keys")
 
 # Flask app setup
 app = Flask(__name__)
@@ -85,6 +86,7 @@ def encrypt_message(message):
 
 
 def fldigi_listener():
+    """Listens for incoming messages from fldigi."""
     logger.info("Starting fldigi listener thread...")
     while True:
         try:
@@ -112,6 +114,7 @@ def fldigi_listener():
 
 @app.route("/", methods=["GET", "POST"])
 def index():
+    """Homepage for broadcasting messages."""
     try:
         return render_template_string(
             '''
@@ -199,9 +202,10 @@ def index():
 
 @app.route("/broadcast", methods=["POST"])
 def broadcast():
+    """Handles broadcasting messages."""
     try:
-        message = request.form.get("message")
-        encryption_choice = request.form.get("encryption")
+        message = request.form.get("message", "")
+        encryption_choice = request.form.get("encryption", "encrypted")
 
         if not message or len(message) > 1024:
             return "<h1>Error: Message cannot be empty or too long!</h1><a href='/'>Try Again</a>"
@@ -233,6 +237,7 @@ def broadcast():
 
 @app.route("/public_key", methods=["GET"])
 def public_key_page():
+    """Displays the user's public key."""
     try:
         with open(PUBLIC_KEY_PATH, "r") as public_file:
             public_key_content = public_file.read()
@@ -262,41 +267,34 @@ def public_key_page():
 
 @app.route("/settings", methods=["GET", "POST"])
 def settings():
+    """Allows users to change operating modes and manage public keys."""
     try:
-        # Get current modem mode and available modes
+        os.makedirs(PUBLIC_KEYS_DIR, exist_ok=True)
+
         current_mode = fldigi_client.modem.name
         modes = fldigi_client.modem.names
 
-        # Directory for storing public keys
-        os.makedirs(KEY_DIR, exist_ok=True)
-        public_keys_dir = os.path.join(KEY_DIR, "public_keys")
-        os.makedirs(public_keys_dir, exist_ok=True)
-
         if request.method == "POST":
-            # Handle mode change
             if "change_mode" in request.form:
                 new_mode = request.form.get("mode")
-                if new_mode and new_mode in modes:
+                if new_mode in modes:
                     fldigi_client.modem.name = new_mode
                     logger.info(f"Mode changed to {new_mode}")
 
-            # Handle public key import
             if "import_key" in request.form:
-                key_alias = request.form.get("key_alias").strip()
-                public_key_content = request.form.get("public_key").strip()
+                key_alias = request.form.get("key_alias", "").strip()
+                public_key_content = request.form.get("public_key", "").strip()
                 if key_alias and public_key_content:
-                    key_file_path = os.path.join(public_keys_dir, f"{key_alias}.pem")
+                    key_path = os.path.join(PUBLIC_KEYS_DIR, f"{key_alias}.pem")
                     try:
-                        # Validate the public key format
                         RSA.import_key(public_key_content)
-                        with open(key_file_path, "w") as key_file:
+                        with open(key_path, "w") as key_file:
                             key_file.write(public_key_content)
-                        logger.info(f"Imported public key with alias '{key_alias}'")
+                        logger.info(f"Public key '{key_alias}' imported successfully.")
                     except ValueError as e:
                         logger.error(f"Invalid public key format: {e}")
 
-        # List stored public keys
-        stored_keys = [f.replace(".pem", "") for f in os.listdir(public_keys_dir) if f.endswith(".pem")]
+        stored_keys = [key.replace(".pem", "") for key in os.listdir(PUBLIC_KEYS_DIR) if key.endswith(".pem")]
 
         return render_template_string(
             '''
@@ -305,13 +303,13 @@ def settings():
             <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>RF Fox - Settings</title>
+                <title>RF Fox Settings</title>
             </head>
             <body>
                 <h1>Settings</h1>
 
                 <h2>Operating Mode</h2>
-                <form method="POST" action="/settings">
+                <form method="POST">
                     <input type="hidden" name="change_mode" value="1">
                     <label for="mode">Select Mode:</label>
                     <select id="mode" name="mode">
@@ -324,7 +322,7 @@ def settings():
                 <h2>Current Mode: {{ current_mode }}</h2>
 
                 <h2>Import Public Key</h2>
-                <form method="POST" action="/settings">
+                <form method="POST">
                     <input type="hidden" name="import_key" value="1">
                     <label for="key_alias">Key Alias:</label>
                     <input type="text" id="key_alias" name="key_alias" required>
