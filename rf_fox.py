@@ -225,6 +225,7 @@ def public_key_page():
                         border-radius: 5px;
                         word-wrap: break-word;
                         font-family: monospace;
+                        position: relative;
                     }
                     .back-link {
                         display: inline-block;
@@ -239,13 +240,37 @@ def public_key_page():
                     .back-link:hover {
                         background-color: #f0f0f0;
                     }
+                    .copy-button {
+                        margin-top: 10px;
+                        padding: 10px 15px;
+                        background-color: #007BFF;
+                        color: white;
+                        border: none;
+                        border-radius: 5px;
+                        cursor: pointer;
+                        font-weight: bold;
+                    }
+                    .copy-button:hover {
+                        background-color: #0056b3;
+                    }
                 </style>
+                <script>
+                    function copyToClipboard() {
+                        const publicKey = document.getElementById("publicKey").innerText;
+                        navigator.clipboard.writeText(publicKey).then(() => {
+                            alert("Public key copied to clipboard!");
+                        }).catch(err => {
+                            alert("Failed to copy public key: " + err);
+                        });
+                    }
+                </script>
             </head>
             <body>
                 <h1>My Public Key</h1>
                 <div class="key-container">
-                    <pre>{{ public_key }}</pre>
+                    <pre id="publicKey">{{ public_key }}</pre>
                 </div>
+                <button class="copy-button" onclick="copyToClipboard()">Copy to Clipboard</button>
                 <a href="/" class="back-link">Back to Home</a>
             </body>
             </html>
