@@ -116,6 +116,10 @@ def fldigi_listener():
 def index():
     """Homepage for broadcasting messages."""
     try:
+        # Load stored public keys for the dropdown
+        os.makedirs(PUBLIC_KEYS_DIR, exist_ok=True)
+        stored_keys = [key.replace(".pem", "") for key in os.listdir(PUBLIC_KEYS_DIR) if key.endswith(".pem")]
+
         return render_template_string(
             '''
             <!doctype html>
@@ -163,10 +167,20 @@ def index():
                     <textarea id="message" name="message" required style="resize: both; width: 100%; height: 100px;"></textarea>
                     <br><br>
                     <label for="encryption">Send as:</label>
-                    <select id="encryption" name="encryption">
+                    <select id="encryption" name="encryption" onchange="toggleKeyDropdown(this.value)">
                         <option value="encrypted" selected>Encrypted</option>
                         <option value="unencrypted">Unencrypted</option>
                     </select>
+                    <br><br>
+                    <div id="keyDropdown" style="display: block;">
+                        <label for="key_alias">Select Public Key:</label>
+                        <select id="key_alias" name="key_alias">
+                            <option value="app_key">App Public Key (Default)</option>
+                            {% for key in stored_keys %}
+                            <option value="{{ key }}">{{ key }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
                     <br><br>
                     <input type="submit" value="Broadcast">
                 </form>
@@ -183,17 +197,29 @@ def index():
                         <strong>Timestamp:</strong> {{ msg.timestamp }}<br>
                         {% if msg.encrypted %}
                             <strong>Encrypted:</strong> {{ msg.encrypted }}<br>
-                            <strong>Decrypted:</strong> {{ msg.decrypted }}
+                            <strong>Decrypted:</strong> {{ msg.decrypted }}<br>
+                            <strong>Key Used:</strong> {{ msg.key }}
                         {% else %}
                             <strong>Message:</strong> {{ msg.decrypted }}
                         {% endif %}
                     </li>
                 {% endfor %}
                 </ul>
+                <script>
+                    function toggleKeyDropdown(value) {
+                        const dropdown = document.getElementById("keyDropdown");
+                        if (value === "encrypted") {
+                            dropdown.style.display = "block";
+                        } else {
+                            dropdown.style.display = "none";
+                        }
+                    }
+                </script>
             </body>
             </html>
             ''',
             messages=messages,
+            stored_keys=stored_keys,
         )
     except Exception as e:
         logger.error(f"Error in index route: {e}")
@@ -204,32 +230,71 @@ def index():
 def broadcast():
     """Handles broadcasting messages."""
     try:
-        message = request.form.get("message", "")
-        encryption_choice = request.form.get("encryption", "encrypted")
+        message = request.form.get("message", "").strip()
+        encryption_choice = request.form.get("encryption", "unencrypted")
+        key_alias = request.form.get("key_alias", "app_key").strip()
 
         if not message or len(message) > 1024:
             return "<h1>Error: Message cannot be empty or too long!</h1><a href='/'>Try Again</a>"
 
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        used_key = None
 
         if encryption_choice == "unencrypted":
+            # Broadcast unencrypted message
             fldigi_client.text.clear_tx()
             fldigi_client.text.add_tx(message)
             fldigi_client.main.tx()
-        else:
-            encrypted_message = encrypt_message(message)
-            fldigi_client.text.clear_tx()
-            fldigi_client.text.add_tx(encrypted_message)
-            fldigi_client.main.tx()
 
-        with messages_lock:
-            messages["transmitted"].append({
-                "encrypted": encrypt_message(message) if encryption_choice == "encrypted" else None,
-                "decrypted": message,
-                "timestamp": timestamp,
-            })
+            with messages_lock:
+                messages["transmitted"].append({
+                    "encrypted": None,
+                    "decrypted": message,
+                    "key": "None",
+                    "timestamp": timestamp,
+                })
+
+        else:
+            # Load the selected public key
+            if key_alias == "app_key":
+                # Use the app's public key
+                public_key_path = PUBLIC_KEY_PATH
+                used_key = "App Public Key"
+            else:
+                # Use the selected imported key
+                public_key_path = os.path.join(PUBLIC_KEYS_DIR, f"{key_alias}.pem")
+                used_key = key_alias
+
+            if not os.path.exists(public_key_path):
+                return f"<h1>Error: Public key '{key_alias}' not found!</h1><a href='/'>Try Again</a>"
+
+            # Encrypt the message using the selected public key
+            try:
+                with open(public_key_path, "r") as key_file:
+                    public_key = RSA.import_key(key_file.read())
+                cipher = PKCS1_OAEP.new(public_key)
+                encrypted_message = cipher.encrypt(message.encode("utf-8"))
+                encrypted_message_b64 = base64.b64encode(encrypted_message).decode("utf-8")
+
+                # Broadcast the encrypted message
+                fldigi_client.text.clear_tx()
+                fldigi_client.text.add_tx(encrypted_message_b64)
+                fldigi_client.main.tx()
+
+                with messages_lock:
+                    messages["transmitted"].append({
+                        "encrypted": encrypted_message_b64,
+                        "decrypted": message,
+                        "key": used_key,
+                        "timestamp": timestamp,
+                    })
+
+            except Exception as e:
+                logger.error(f"Encryption failed: {e}")
+                return f"<h1>Error during encryption: {str(e)}</h1><a href='/'>Try Again</a>"
 
         return "<h1>Message Broadcast Successfully!</h1><a href='/'>Back</a>"
+
     except Exception as e:
         logger.error(f"Error during broadcast: {e}")
         return f"<h1>Error: {str(e)}</h1><a href='/'>Try Again</a>"
