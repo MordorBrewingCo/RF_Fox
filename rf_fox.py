@@ -124,8 +124,27 @@ def index():
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>RF Fox</title>
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        margin: 20px;
+                        padding: 0;
+                        text-align: left;
+                    }
+                    img {
+                        max-width: 80%;
+                        height: auto;
+                        margin-bottom: 20px;
+                        border-radius: 10px;
+                        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                    }
+                    form {
+                        margin-bottom: 30px;
+                    }
+                </style>
             </head>
             <body>
+                <img src="static/logo.png" alt="RF Fox Logo">
                 <h1>Broadcast a Message</h1>
                 <form method="POST" action="/broadcast">
                     <label for="message">Message:</label>
