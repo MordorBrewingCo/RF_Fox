@@ -7,7 +7,7 @@ import time
 import pyfldigi
 from Crypto.Cipher import PKCS1_OAEP
 from Crypto.PublicKey import RSA
-from flask import Flask, request, render_template_string
+from flask import Flask, render_template_string
 
 # Constants
 KEY_DIR = os.path.expanduser("~/.rf_fox")
@@ -65,7 +65,6 @@ private_cipher = PKCS1_OAEP.new(private_key)
 public_cipher = PKCS1_OAEP.new(public_key)
 
 
-# RSA decryption function
 def decrypt_message(encrypted_message):
     try:
         encrypted_data = base64.b64decode(encrypted_message)
@@ -76,7 +75,6 @@ def decrypt_message(encrypted_message):
         return None
 
 
-# RSA encryption function
 def encrypt_message(message):
     try:
         ciphertext = public_cipher.encrypt(message.encode("utf-8"))
@@ -86,7 +84,6 @@ def encrypt_message(message):
         return None
 
 
-# Listener thread function
 def fldigi_listener():
     logger.info("Starting fldigi listener thread...")
     while True:
@@ -131,19 +128,31 @@ def index():
                         padding: 0;
                         text-align: left;
                     }
-                    img {
-                        max-width: 80%;
-                        height: auto;
-                        margin-bottom: 20px;
-                        border-radius: 10px;
-                        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                    .top-right-nav {
+                        position: absolute;
+                        top: 10px;
+                        right: 10px;
+                        display: flex;
+                        gap: 10px;
                     }
-                    form {
-                        margin-bottom: 30px;
+                    .top-right-nav a {
+                        text-decoration: none;
+                        color: #007BFF;
+                        font-weight: bold;
+                        padding: 5px 10px;
+                        border-radius: 5px;
+                        transition: background-color 0.3s ease;
+                    }
+                    .top-right-nav a:hover {
+                        background-color: #f0f0f0;
                     }
                 </style>
             </head>
             <body>
+                <div class="top-right-nav">
+                    <a href="/settings">Settings</a>
+                    <a href="/public_key">My Public Key</a>
+                </div>
                 <img src="static/logo.png" alt="RF Fox Logo">
                 <h1>Broadcast a Message</h1>
                 <form method="POST" action="/broadcast">
@@ -158,7 +167,6 @@ def index():
                     <br><br>
                     <input type="submit" value="Broadcast">
                 </form>
-                <a href="/settings">Go to Settings</a>
                 <h2>Received Messages</h2>
                 <ul>
                 {% for msg in messages["received"] %}
@@ -189,77 +197,11 @@ def index():
         return "<h1>Error loading index page</h1>"
 
 
-@app.route("/broadcast", methods=["POST"])
-def broadcast():
+@app.route("/public_key", methods=["GET"])
+def public_key_page():
     try:
-        message = request.form.get("message")
-        encryption_choice = request.form.get("encryption")
-
-        if not message or len(message) > 1024:
-            return "<h1>Error: Message cannot be empty or too long!</h1><a href='/'>Try Again</a>"
-
-        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-
-        if encryption_choice == "unencrypted":
-            fldigi_client.text.clear_tx()
-            fldigi_client.text.add_tx(message)
-            fldigi_client.main.tx()
-        else:
-            encrypted_message = encrypt_message(message)
-            fldigi_client.text.clear_tx()
-            fldigi_client.text.add_tx(encrypted_message)
-            fldigi_client.main.tx()
-
-        with messages_lock:
-            messages["transmitted"].append({
-                "encrypted": encrypt_message(message) if encryption_choice == "encrypted" else None,
-                "decrypted": message,
-                "timestamp": timestamp,
-            })
-
-        return "<h1>Message Broadcast Successfully!</h1><a href='/'>Back</a>"
-    except Exception as e:
-        logger.error(f"Error during broadcast: {e}")
-        return f"<h1>Error: {str(e)}</h1><a href='/'>Try Again</a>"
-
-
-@app.route("/settings", methods=["GET", "POST"])
-def settings():
-    try:
-        # Get current modem mode and available modes
-        current_mode = fldigi_client.modem.name
-        modes = fldigi_client.modem.names
-
-        # Directory for storing public keys
-        os.makedirs(KEY_DIR, exist_ok=True)
-        public_keys_dir = os.path.join(KEY_DIR, "public_keys")
-        os.makedirs(public_keys_dir, exist_ok=True)
-
-        if request.method == "POST":
-            # Handle mode change
-            if "change_mode" in request.form:
-                new_mode = request.form.get("mode")
-                if new_mode and new_mode in modes:
-                    fldigi_client.modem.name = new_mode
-                    logger.info(f"Mode changed to {new_mode}")
-
-            # Handle public key import
-            if "import_key" in request.form:
-                key_alias = request.form.get("key_alias").strip()
-                public_key_content = request.form.get("public_key").strip()
-                if key_alias and public_key_content:
-                    key_file_path = os.path.join(public_keys_dir, f"{key_alias}.pem")
-                    try:
-                        # Validate the public key format
-                        RSA.import_key(public_key_content)
-                        with open(key_file_path, "w") as key_file:
-                            key_file.write(public_key_content)
-                        logger.info(f"Imported public key with alias '{key_alias}'")
-                    except ValueError as e:
-                        logger.error(f"Invalid public key format: {e}")
-
-        # List stored public keys
-        stored_keys = [f.replace(".pem", "") for f in os.listdir(public_keys_dir) if f.endswith(".pem")]
+        with open(PUBLIC_KEY_PATH, "r") as public_file:
+            public_key_content = public_file.read()
 
         return render_template_string(
             '''
@@ -268,54 +210,51 @@ def settings():
             <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>RF Fox - Settings</title>
+                <title>My Public Key</title>
+                <style>
+                    body {
+                        font-family: Arial, sans-serif;
+                        margin: 20px;
+                        padding: 0;
+                        text-align: left;
+                    }
+                    .key-container {
+                        background-color: #f9f9f9;
+                        padding: 20px;
+                        border: 1px solid #ddd;
+                        border-radius: 5px;
+                        word-wrap: break-word;
+                        font-family: monospace;
+                    }
+                    .back-link {
+                        display: inline-block;
+                        margin-top: 20px;
+                        text-decoration: none;
+                        color: #007BFF;
+                        font-weight: bold;
+                        padding: 5px 10px;
+                        border-radius: 5px;
+                        transition: background-color 0.3s ease;
+                    }
+                    .back-link:hover {
+                        background-color: #f0f0f0;
+                    }
+                </style>
             </head>
             <body>
-                <h1>Settings</h1>
-
-                <h2>Operating Mode</h2>
-                <form method="POST" action="/settings">
-                    <input type="hidden" name="change_mode" value="1">
-                    <label for="mode">Select Mode:</label>
-                    <select id="mode" name="mode">
-                        {% for mode in modes %}
-                        <option value="{{ mode }}" {% if mode == current_mode %}selected{% endif %}>{{ mode }}</option>
-                        {% endfor %}
-                    </select>
-                    <button type="submit">Change Mode</button>
-                </form>
-                <h2>Current Mode: {{ current_mode }}</h2>
-
-                <h2>Import Public Key</h2>
-                <form method="POST" action="/settings">
-                    <input type="hidden" name="import_key" value="1">
-                    <label for="key_alias">Key Alias:</label>
-                    <input type="text" id="key_alias" name="key_alias" required>
-                    <br><br>
-                    <label for="public_key">Public Key:</label>
-                    <textarea id="public_key" name="public_key" required style="resize: both; width: 100%; height: 100px;"></textarea>
-                    <br><br>
-                    <button type="submit">Import Key</button>
-                </form>
-
-                <h2>Stored Public Keys</h2>
-                <ul>
-                    {% for key in stored_keys %}
-                    <li>{{ key }}</li>
-                    {% endfor %}
-                </ul>
-
-                <a href="/">Back to Home</a>
+                <h1>My Public Key</h1>
+                <div class="key-container">
+                    <pre>{{ public_key }}</pre>
+                </div>
+                <a href="/" class="back-link">Back to Home</a>
             </body>
             </html>
             ''',
-            current_mode=current_mode,
-            modes=modes,
-            stored_keys=stored_keys,
+            public_key=public_key_content,
         )
     except Exception as e:
-        logger.error(f"Error in settings route: {e}")
-        return "<h1>Error loading settings page</h1>"
+        logger.error(f"Error in public key page: {e}")
+        return "<h1>Error loading public key page</h1><a href='/'>Back to Home</a>"
 
 
 if __name__ == "__main__":
