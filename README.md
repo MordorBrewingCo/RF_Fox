@@ -1,3 +1,18 @@
+# Disclaimer ⚠️
+
+**IMPORTANT: READ THIS BEFORE USING THIS PROJECT**
+
+This project is intended **strictly for educational purposes** to demonstrate concepts in radio frequency (RF) transmission and encryption. **The use of encrypted RF transmissions is illegal in many jurisdictions** without proper authorization, as it can interfere with public safety communications and other critical systems. It is your responsibility to comply with all applicable laws and regulations.
+
+By using this code, you agree that the authors and contributors to this project are **not responsible** for any actions you take with it. Any misuse, including illegal or unauthorized RF encryption, is solely at your own risk.
+
+Please, don’t be that person who causes havoc with RF signals. The world has enough problems already.
+
+---
+
+### Zombie Apocalypse Exception 🧟‍♂️  
+If society collapses, and you’re using this to coordinate with your survivor squad against the undead, we won’t hold it against you. Until then, play by the rules!
+
 # RF Fox: Secure Message Broadcasting with Fldigi
 
 RF Fox is a Flask-based application that enables secure message broadcasting using the Fldigi software modem. Messages can be encrypted using AES encryption or sent unencrypted, depending on user preference. It also includes a web interface for managing messages and operating modes.
