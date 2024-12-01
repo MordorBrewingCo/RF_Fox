@@ -13,13 +13,15 @@ Please, don’t be that person who causes havoc with RF signals. The world has e
 ### Zombie Apocalypse Exception 🧟‍♂️  
 If society collapses, and you’re using this to coordinate with your survivor squad against the undead, we won’t hold it against you. Until then, play by the rules!
 
+---
+
 # RF Fox: Secure Message Broadcasting with Fldigi
 
-RF Fox is a Flask-based application that enables secure message broadcasting using the Fldigi software modem. Messages can be encrypted using AES encryption or sent unencrypted, depending on user preference. It also includes a web interface for managing messages and operating modes.
+RF Fox is a Flask-based application that enables secure message broadcasting using the Fldigi software modem. Messages can be encrypted using asymmetric cryptography leveraging RSA keys or sent unencrypted, depending on user preference. It also includes a web interface for managing messages and operating modes.
 
 ## Features
 
-- **Secure Broadcasting**: Messages can be sent encrypted with AES-128 encryption.
+- **Secure Broadcasting**: Messages can be sent encrypted with RSA key based encryption.
 - **Unencrypted Option**: Allows sending plain-text messages when encryption is not required.
 - **Web Interface**: Includes an intuitive web UI for:
   - Sending messages
