@@ -21,7 +21,7 @@ echo "Activating Python virtual environment and starting RF_fox..."
 cd $REPO_DIR || { echo "Failed to change directory to $REPO_DIR. Exiting."; exit 1; }
 
 if [ -f "$VENV_DIR/bin/activate" ]; then
-    screen -dmS $RF_FOX_SCREEN_NAME bash -c "source $VENV_DIR/bin/activate && python3 RF_fox.py"
+    screen -dmS $RF_FOX_SCREEN_NAME bash -c "source $VENV_DIR/bin/activate && python3 $REPO_DIR/rf_fox.py"
     if [ $? -eq 0 ]; then
         echo "RF_fox started successfully in a detached screen session named '$RF_FOX_SCREEN_NAME'."
     else
