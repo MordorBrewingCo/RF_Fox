@@ -2,7 +2,7 @@
 
 **IMPORTANT: READ THIS BEFORE USING THIS PROJECT**
 
-This project is intended **strictly for educational purposes** to demonstrate concepts in radio frequency (RF) transmission and encryption. **The use of encrypted RF transmissions is illegal in many jurisdictions** without proper authorization, as it can interfere with public safety communications and other critical systems. It is your responsibility to comply with all applicable laws and regulations.
+This project is intended **strictly for educational purposes** to demonstrate concepts in radio frequency (RF) transmission and encryption. **The use of encrypted RF transmissions is illegal in many jurisdictions** without proper authorization.  It is your responsibility to comply with all applicable laws and regulations.
 
 By using this code, you agree that the authors and contributors to this project are **not responsible** for any actions you take with it. Any misuse, including illegal or unauthorized RF encryption, is solely at your own risk.
 
